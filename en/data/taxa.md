@@ -9,7 +9,7 @@ composition:
   - type: taxaSearch
     inlineData:
       apiUrl: https://sfg.taxonworks.org/api/v1
-      # projectToken: your-project-token-here  # set this to a TaxonWorks project_token to enable results
+      projectToken: ZEJhFp9sq8kBfks15qAbAg
       perPage: 25
 ---
 
