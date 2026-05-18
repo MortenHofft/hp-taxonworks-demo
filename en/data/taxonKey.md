@@ -1,7 +1,7 @@
 ---
 title: Taxon
 description: Taxon detail loaded from the TaxonWorks API
-permalink: /taxon/key/_key_
+permalink: /taxon/key
 lang-ref: taxonKey
 layout: compose
 composition:

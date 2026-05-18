@@ -37,9 +37,8 @@
       .replace(/'/g, '&#39;');
   }
 
-  function getOtuIdFromPath() {
-    var m = window.location.pathname.match(/\/taxon\/key\/([^\/?#]+)/);
-    return m ? decodeURIComponent(m[1]) : null;
+  function getOtuId() {
+    return new URLSearchParams(window.location.search).get('id');
   }
 
   function apiFetch(path) {
@@ -66,7 +65,7 @@
     parents.forEach(function (p) {
       html += '<ol style="list-style: none; padding-left: 1.25rem; margin: 0.25rem 0; border-left: 2px solid #eee;">' +
         '<li style="padding: 0.15rem 0;">' +
-        '<a href="/taxon/key/' + encodeURIComponent(p.id) + '">' + nameOf(p) + '</a>';
+        '<a href="/taxon/key?id=' + encodeURIComponent(p.id) + '">' + nameOf(p) + '</a>';
       closing = '</li></ol>' + closing;
     });
     breadcrumbEl.innerHTML = html + closing;
@@ -80,15 +79,15 @@
     childrenEl.innerHTML = '<ul style="list-style: disc; padding-left: 1.25rem; margin: 0;">' +
       descendants.map(function (c) {
         return '<li style="padding: 0.15rem 0;">' +
-          '<a href="/taxon/key/' + encodeURIComponent(c.id) + '">' + nameOf(c) + '</a>' +
+          '<a href="/taxon/key?id=' + encodeURIComponent(c.id) + '">' + nameOf(c) + '</a>' +
           '</li>';
       }).join('') +
       '</ul>';
   }
 
   function load() {
-    var otuId = getOtuIdFromPath();
-    if (!otuId || otuId === '_key_') {
+    var otuId = getOtuId();
+    if (!otuId) {
       titleEl.textContent = 'No taxon id in URL';
       childrenEl.textContent = '';
       return;
