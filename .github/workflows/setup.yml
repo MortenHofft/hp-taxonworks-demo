@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       siteName:
-        description: 'Replace template_site with the name of the site (excluding the hp prefix)'
+        description: 'Replace taxonworks-demo with the name of the site (excluding the hp prefix)'
         required: true
         type: string
 
@@ -19,7 +19,7 @@ jobs:
           
       - name: Search and replace
         run: |
-          find . -path ./.github -prune -o -type f \( -name "*.yml" -o -name "*.js" -o -name "*.md" -o -name "*.html" \) -exec sed -i 's/template_site/${{ inputs.siteName }}/g' {} +
+          find . -path ./.github -prune -o -type f \( -name "*.yml" -o -name "*.js" -o -name "*.md" -o -name "*.html" \) -exec sed -i 's/taxonworks-demo/${{ inputs.siteName }}/g' {} +
           sed -i 's|https://template.hp.gbif-staging.org/|https://${{ inputs.siteName }}.hp.gbif-staging.org/|g' _config_staging.yml
           
       - name: Commit changes
