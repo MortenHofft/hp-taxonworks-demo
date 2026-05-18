@@ -12,6 +12,8 @@
     href: /collection/search
   - text: Literature
     href: /literature/search
+- text: Taxa
+  href: /taxa/search
 - text: Links
   menu: # Dropdown menu (one level deep only)
   - text: Base theme demo

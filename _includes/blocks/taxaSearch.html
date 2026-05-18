@@ -1,0 +1,232 @@
+{% assign apiUrl = include.content.apiUrl | default: "https://sfg.taxonworks.org/api/v1" %}
+{% assign projectToken = include.content.projectToken | default: "" %}
+{% assign perPage = include.content.perPage | default: 25 %}
+
+<section class="taxaSearch" style="max-width: 1100px; margin: 0 auto; padding: 2rem 1rem;">
+  <form id="taxaSearchForm" class="taxaSearch__form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; align-items: end; margin-bottom: 1rem;">
+    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
+      Scientific name
+      <input type="text" name="scientificName" placeholder="e.g. Apis" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
+    </label>
+    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
+      Author
+      <input type="text" name="scientificNameAuthorship" placeholder="e.g. Linnaeus" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
+    </label>
+    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
+      Family
+      <input type="text" name="family" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
+    </label>
+    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
+      Genus
+      <input type="text" name="genus" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
+    </label>
+    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
+      Country
+      <input type="text" name="country" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
+    </label>
+    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
+      Type status
+      <select name="typeStatus" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
+        <option value="">Any</option>
+        <option value="Holotype">Holotype</option>
+        <option value="Lectotype">Lectotype</option>
+        <option value="Syntype">Syntype</option>
+        <option value="Paratype">Paratype</option>
+        <option value="Paralectotype">Paralectotype</option>
+        <option value="Neotype">Neotype</option>
+        <option value="Neolectotype">Neolectotype</option>
+      </select>
+    </label>
+    <div style="display: flex; gap: 0.5rem;">
+      <button type="submit" style="padding: 0.5rem 1rem; background: var(--primary-color, #fa5e97); color: #fff; border: 0; border-radius: 3px; cursor: pointer;">Search</button>
+      <button type="reset" style="padding: 0.5rem 1rem; background: #eee; color: #333; border: 0; border-radius: 3px; cursor: pointer;">Reset</button>
+    </div>
+  </form>
+
+  <div id="taxaSearchStatus" style="margin: 0.5rem 0; color: #555; font-size: 0.9rem;"></div>
+
+  <ul id="taxaSearchResults" style="list-style: none; padding: 0; margin: 0; border-top: 1px solid #eee;"></ul>
+
+  <nav id="taxaSearchPagination" style="display: flex; gap: 0.5rem; align-items: center; justify-content: center; margin-top: 1rem;"></nav>
+</section>
+
+<script>
+(function () {
+  var API_URL = {{ apiUrl | jsonify }};
+  var PROJECT_TOKEN = {{ projectToken | jsonify }};
+  var PER_PAGE = parseInt({{ perPage | jsonify }}, 10) || 25;
+
+  var form = document.getElementById('taxaSearchForm');
+  var resultsEl = document.getElementById('taxaSearchResults');
+  var statusEl = document.getElementById('taxaSearchStatus');
+  var paginationEl = document.getElementById('taxaSearchPagination');
+
+  var state = {
+    page: 1,
+    total: 0,
+    perPage: PER_PAGE,
+    filters: {}
+  };
+
+  function flattenParams(params) {
+    var parts = [];
+    function add(key, val) {
+      if (val === null || val === undefined || val === '') return;
+      if (Array.isArray(val)) {
+        val.forEach(function (v) { add(key + '[]', v); });
+      } else if (typeof val === 'object') {
+        Object.keys(val).forEach(function (k) { add(key + '[' + k + ']', val[k]); });
+      } else {
+        parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(val));
+      }
+    }
+    Object.keys(params).forEach(function (k) { add(k, params[k]); });
+    return parts.join('&');
+  }
+
+  function readFilters() {
+    var data = new FormData(form);
+    var filters = {};
+    data.forEach(function (value, key) {
+      var v = (value || '').toString().trim();
+      if (v) filters[key] = v;
+    });
+    return filters;
+  }
+
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg || '';
+    statusEl.style.color = isError ? '#c00' : '#555';
+  }
+
+  function escapeHtml(s) {
+    return (s == null ? '' : String(s))
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderResults(items) {
+    if (!items || !items.length) {
+      resultsEl.innerHTML = '<li style="padding: 1rem; color: #777;">No results.</li>';
+      return;
+    }
+    resultsEl.innerHTML = items.map(function (item) {
+      var name = item.object_tag || item.cached || item.name || ('Otu #' + item.id);
+      return '<li style="padding: 0.6rem 0.4rem; border-bottom: 1px solid #eee;">' +
+        '<a href="https://sfg.taxonworks.org/otus/' + encodeURIComponent(item.id) + '" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">' +
+        name +
+        ' <span style="color: #999; font-size: 0.85rem;">(id: ' + escapeHtml(item.id) + ')</span>' +
+        '</a></li>';
+    }).join('');
+  }
+
+  function renderPagination() {
+    var totalPages = state.perPage > 0 ? Math.max(1, Math.ceil(state.total / state.perPage)) : 1;
+    if (state.total === 0) {
+      paginationEl.innerHTML = '';
+      return;
+    }
+    var btn = function (label, page, disabled) {
+      return '<button type="button" data-page="' + page + '"' +
+        (disabled ? ' disabled' : '') +
+        ' style="padding: 0.35rem 0.7rem; border: 1px solid #ccc; background: ' +
+        (disabled ? '#f5f5f5' : '#fff') + '; color: #333; border-radius: 3px; cursor: ' +
+        (disabled ? 'default' : 'pointer') + ';">' + label + '</button>';
+    };
+    paginationEl.innerHTML =
+      btn('« First', 1, state.page <= 1) +
+      btn('‹ Prev', state.page - 1, state.page <= 1) +
+      '<span style="font-size: 0.9rem; color: #555;">Page ' + state.page + ' of ' + totalPages +
+        ' &middot; ' + state.total.toLocaleString() + ' results</span>' +
+      btn('Next ›', state.page + 1, state.page >= totalPages) +
+      btn('Last »', totalPages, state.page >= totalPages);
+  }
+
+  function fetchResults() {
+    if (!PROJECT_TOKEN) {
+      setStatus('No TaxonWorks project_token configured. Set `projectToken` in the taxaSearch block inlineData (en/data/taxa.md).', true);
+      resultsEl.innerHTML = '';
+      paginationEl.innerHTML = '';
+      return;
+    }
+
+    var dwcQuery = {};
+    var wildcardAttrs = [];
+    Object.keys(state.filters).forEach(function (k) {
+      if (k === 'typeStatus') {
+        dwcQuery[k] = state.filters[k];
+      } else {
+        dwcQuery[k] = state.filters[k];
+        wildcardAttrs.push(k);
+      }
+    });
+    if (wildcardAttrs.length) dwcQuery.wildcard_attribute = wildcardAttrs;
+
+    var params = {
+      project_token: PROJECT_TOKEN,
+      page: state.page,
+      per: state.perPage,
+      dwc_occurrence_query: dwcQuery
+    };
+
+    var url = API_URL.replace(/\/$/, '') + '/otus/inventory/alphabetical?' + flattenParams(params);
+
+    setStatus('Loading…');
+    resultsEl.innerHTML = '';
+
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var total = parseInt(res.headers.get('pagination-total') || '0', 10);
+        var per = parseInt(res.headers.get('pagination-per-page') || state.perPage, 10);
+        var page = parseInt(res.headers.get('pagination-page') || state.page, 10);
+        state.total = isNaN(total) ? 0 : total;
+        state.perPage = isNaN(per) || per <= 0 ? state.perPage : per;
+        state.page = isNaN(page) || page <= 0 ? state.page : page;
+        return res.json();
+      })
+      .then(function (items) {
+        setStatus('');
+        renderResults(items);
+        renderPagination();
+      })
+      .catch(function (err) {
+        setStatus('Request failed: ' + err.message, true);
+        resultsEl.innerHTML = '';
+        paginationEl.innerHTML = '';
+      });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    state.filters = readFilters();
+    state.page = 1;
+    fetchResults();
+  });
+
+  form.addEventListener('reset', function () {
+    setTimeout(function () {
+      state.filters = {};
+      state.page = 1;
+      fetchResults();
+    }, 0);
+  });
+
+  paginationEl.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.tagName === 'BUTTON' && t.dataset.page) {
+      var p = parseInt(t.dataset.page, 10);
+      if (!isNaN(p) && p >= 1) {
+        state.page = p;
+        fetchResults();
+        window.scrollTo({ top: form.offsetTop - 20, behavior: 'smooth' });
+      }
+    }
+  });
+
+  fetchResults();
+})();
+</script>
