@@ -1,0 +1,134 @@
+{% assign apiUrl = include.content.apiUrl | default: "https://sfg.taxonworks.org/api/v1" %}
+{% assign projectToken = include.content.projectToken | default: "" %}
+
+<section class="taxonDetail" style="max-width: 1100px; margin: 0 auto; padding: 2rem 1rem;">
+  <p><a href="/taxa/search" style="font-size: 0.9rem;">&larr; Back to search</a></p>
+
+  <h1 id="taxonDetailTitle" style="margin: 0.25rem 0 0.5rem;">Loading…</h1>
+
+  <nav id="taxonDetailBreadcrumb" aria-label="Taxonomic hierarchy"></nav>
+
+  <div id="taxonDetailStatus" style="color: #c00; font-size: 0.9rem; margin: 0.5rem 0;"></div>
+
+  <section id="taxonDetailChildrenCard" style="margin-top: 1.5rem; padding: 1rem 1.25rem; border: 1px solid #e3e3e3; border-radius: 4px; background: #fafafa;">
+    <h2 style="margin: 0 0 0.5rem; font-size: 1.1rem;">Children</h2>
+    <div id="taxonDetailChildren">Loading…</div>
+  </section>
+</section>
+
+<script>
+(function () {
+  var API_URL = {{ apiUrl | jsonify }};
+  var PROJECT_TOKEN = {{ projectToken | jsonify }};
+
+  var titleEl = document.getElementById('taxonDetailTitle');
+  var breadcrumbEl = document.getElementById('taxonDetailBreadcrumb');
+  var childrenEl = document.getElementById('taxonDetailChildren');
+  var statusEl = document.getElementById('taxonDetailStatus');
+
+  function setStatus(msg) { statusEl.textContent = msg || ''; }
+
+  function escapeHtml(s) {
+    return (s == null ? '' : String(s))
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function getOtuIdFromPath() {
+    var m = window.location.pathname.match(/\/taxon\/key\/([^\/?#]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  function apiFetch(path) {
+    var sep = path.indexOf('?') === -1 ? '?' : '&';
+    var url = API_URL.replace(/\/$/, '') + path + sep + 'project_token=' + encodeURIComponent(PROJECT_TOKEN);
+    return fetch(url, { headers: { Accept: 'application/json' } }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + path);
+      return res.json();
+    });
+  }
+
+  function nameOf(node) {
+    return node.object_tag || node.cached_html || node.full_name_tag || node.cached || node.name || ('#' + node.id);
+  }
+
+  function renderBreadcrumb(parents) {
+    if (!parents || !parents.length) {
+      breadcrumbEl.innerHTML = '';
+      return;
+    }
+    // Nested HTML lists: each level contains the next as a child <ol>.
+    var html = '';
+    var closing = '';
+    parents.forEach(function (p) {
+      html += '<ol style="list-style: none; padding-left: 1.25rem; margin: 0.25rem 0; border-left: 2px solid #eee;">' +
+        '<li style="padding: 0.15rem 0;">' +
+        '<a href="/taxon/key/' + encodeURIComponent(p.id) + '">' + nameOf(p) + '</a>';
+      closing = '</li></ol>' + closing;
+    });
+    breadcrumbEl.innerHTML = html + closing;
+  }
+
+  function renderChildren(descendants) {
+    if (!descendants || !descendants.length) {
+      childrenEl.innerHTML = '<p style="margin: 0; color: #777;">No children.</p>';
+      return;
+    }
+    childrenEl.innerHTML = '<ul style="list-style: disc; padding-left: 1.25rem; margin: 0;">' +
+      descendants.map(function (c) {
+        return '<li style="padding: 0.15rem 0;">' +
+          '<a href="/taxon/key/' + encodeURIComponent(c.id) + '">' + nameOf(c) + '</a>' +
+          '</li>';
+      }).join('') +
+      '</ul>';
+  }
+
+  function load() {
+    var otuId = getOtuIdFromPath();
+    if (!otuId || otuId === '_key_') {
+      titleEl.textContent = 'No taxon id in URL';
+      childrenEl.textContent = '';
+      return;
+    }
+    if (!PROJECT_TOKEN) {
+      titleEl.textContent = 'Taxon #' + otuId;
+      setStatus('No TaxonWorks project_token configured. Set projectToken in en/data/taxonKey.md.');
+      childrenEl.textContent = '';
+      return;
+    }
+
+    apiFetch('/otus/' + encodeURIComponent(otuId) + '?extend[]=parents')
+      .then(function (otu) {
+        renderBreadcrumb(otu.parents || []);
+        if (otu.taxon_name_id) {
+          return apiFetch('/taxon_names/' + encodeURIComponent(otu.taxon_name_id))
+            .then(function (taxon) {
+              titleEl.innerHTML = taxon.full_name_tag || taxon.cached_html || escapeHtml(taxon.full_name || taxon.cached || ('Taxon #' + otu.id));
+            })
+            .catch(function () {
+              titleEl.innerHTML = escapeHtml(otu.object_tag || ('Otu #' + otu.id));
+            });
+        } else {
+          titleEl.innerHTML = otu.object_tag || ('Otu #' + escapeHtml(otu.id));
+        }
+      })
+      .catch(function (err) {
+        titleEl.textContent = 'Taxon #' + otuId;
+        setStatus('Failed to load taxon: ' + err.message);
+      });
+
+    apiFetch('/otus/' + encodeURIComponent(otuId) + '/inventory/taxonomy.json?max_descendants_depth=1')
+      .then(function (data) {
+        renderChildren(data.descendants || []);
+      })
+      .catch(function (err) {
+        childrenEl.innerHTML = '<p style="margin: 0; color: #c00;">Failed to load children: ' + escapeHtml(err.message) + '</p>';
+      });
+  }
+
+  load();
+})();
+</script>

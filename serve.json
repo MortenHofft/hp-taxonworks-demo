@@ -16,6 +16,10 @@
     {
       "source": "/collection/*-*/*",
       "destination": "/collection/_key_.html"
+    },
+    {
+      "source": "/taxon/key/*",
+      "destination": "/taxon/key/_key_.html"
     }
   ]
 }

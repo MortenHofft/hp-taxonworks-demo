@@ -61,12 +61,43 @@
   var statusEl = document.getElementById('taxaSearchStatus');
   var paginationEl = document.getElementById('taxaSearchPagination');
 
+  var FILTER_KEYS = ['scientificName', 'scientificNameAuthorship', 'family', 'genus', 'country', 'typeStatus'];
+
   var state = {
     page: 1,
     total: 0,
     perPage: PER_PAGE,
     filters: {}
   };
+
+  function readUrl() {
+    var sp = new URLSearchParams(window.location.search);
+    var filters = {};
+    FILTER_KEYS.forEach(function (k) {
+      var v = sp.get(k);
+      if (v) filters[k] = v;
+    });
+    var page = parseInt(sp.get('page'), 10);
+    return { filters: filters, page: isNaN(page) || page < 1 ? 1 : page };
+  }
+
+  function writeUrl() {
+    var sp = new URLSearchParams();
+    Object.keys(state.filters).forEach(function (k) {
+      if (state.filters[k]) sp.set(k, state.filters[k]);
+    });
+    if (state.page > 1) sp.set('page', state.page);
+    var qs = sp.toString();
+    var newUrl = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    history.replaceState(null, '', newUrl);
+  }
+
+  function applyFiltersToForm(filters) {
+    FILTER_KEYS.forEach(function (k) {
+      var el = form.elements[k];
+      if (el) el.value = filters[k] || '';
+    });
+  }
 
   function flattenParams(params) {
     var parts = [];
@@ -116,7 +147,7 @@
     resultsEl.innerHTML = items.map(function (item) {
       var name = item.object_tag || item.cached || item.name || ('Otu #' + item.id);
       return '<li style="padding: 0.6rem 0.4rem; border-bottom: 1px solid #eee;">' +
-        '<a href="https://sfg.taxonworks.org/otus/' + encodeURIComponent(item.id) + '" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">' +
+        '<a href="/taxon/key/' + encodeURIComponent(item.id) + '" style="text-decoration: none; color: inherit;">' +
         name +
         ' <span style="color: #999; font-size: 0.85rem;">(id: ' + escapeHtml(item.id) + ')</span>' +
         '</a></li>';
@@ -204,6 +235,7 @@
     e.preventDefault();
     state.filters = readFilters();
     state.page = 1;
+    writeUrl();
     fetchResults();
   });
 
@@ -211,6 +243,7 @@
     setTimeout(function () {
       state.filters = {};
       state.page = 1;
+      writeUrl();
       fetchResults();
     }, 0);
   });
@@ -221,12 +254,17 @@
       var p = parseInt(t.dataset.page, 10);
       if (!isNaN(p) && p >= 1) {
         state.page = p;
+        writeUrl();
         fetchResults();
         window.scrollTo({ top: form.offsetTop - 20, behavior: 'smooth' });
       }
     }
   });
 
+  var initial = readUrl();
+  state.filters = initial.filters;
+  state.page = initial.page;
+  applyFiltersToForm(state.filters);
   fetchResults();
 })();
 </script>

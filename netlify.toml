@@ -4,3 +4,8 @@
 
 [build.environment]
   RUBY_VERSION = "3.1.6"
+
+[[redirects]]
+  from = "/taxon/key/*"
+  to = "/taxon/key/_key_/index.html"
+  status = 200
