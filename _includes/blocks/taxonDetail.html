@@ -51,7 +51,17 @@
   }
 
   function nameOf(node) {
-    return node.object_tag || node.cached_html || node.full_name_tag || node.cached || node.name || ('#' + node.id);
+    return node.object_tag || node.cached_html || node.full_name_tag || node.cached || node.name || ('#' + (otuIdOf(node) || ''));
+  }
+
+  function otuIdOf(node) {
+    return node.otu_id != null ? node.otu_id : node.id;
+  }
+
+  function linkItem(node) {
+    var id = otuIdOf(node);
+    if (id == null) return '<span>' + nameOf(node) + '</span>';
+    return '<a href="/taxon/key?id=' + encodeURIComponent(id) + '">' + nameOf(node) + '</a>';
   }
 
   function renderBreadcrumb(parents) {
@@ -65,7 +75,7 @@
     parents.forEach(function (p) {
       html += '<ol style="list-style: none; padding-left: 1.25rem; margin: 0.25rem 0; border-left: 2px solid #eee;">' +
         '<li style="padding: 0.15rem 0;">' +
-        '<a href="/taxon/key?id=' + encodeURIComponent(p.id) + '">' + nameOf(p) + '</a>';
+        linkItem(p);
       closing = '</li></ol>' + closing;
     });
     breadcrumbEl.innerHTML = html + closing;
@@ -78,9 +88,7 @@
     }
     childrenEl.innerHTML = '<ul style="list-style: disc; padding-left: 1.25rem; margin: 0;">' +
       descendants.map(function (c) {
-        return '<li style="padding: 0.15rem 0;">' +
-          '<a href="/taxon/key?id=' + encodeURIComponent(c.id) + '">' + nameOf(c) + '</a>' +
-          '</li>';
+        return '<li style="padding: 0.15rem 0;">' + linkItem(c) + '</li>';
       }).join('') +
       '</ul>';
   }
