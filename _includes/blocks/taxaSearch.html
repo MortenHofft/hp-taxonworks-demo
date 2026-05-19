@@ -43,13 +43,13 @@
             <div class="select is-small is-fullwidth">
               <select id="taxaSearch_typeStatus" name="typeStatus">
                 <option value="">Any</option>
-                <option value="Holotype">Holotype</option>
-                <option value="Lectotype">Lectotype</option>
-                <option value="Syntype">Syntype</option>
-                <option value="Paratype">Paratype</option>
-                <option value="Paralectotype">Paralectotype</option>
-                <option value="Neotype">Neotype</option>
-                <option value="Neolectotype">Neolectotype</option>
+                <option value="holotype">Holotype</option>
+                <option value="lectotype">Lectotype</option>
+                <option value="syntype">Syntype</option>
+                <option value="paratype">Paratype</option>
+                <option value="paralectotype">Paralectotype</option>
+                <option value="neotype">Neotype</option>
+                <option value="neolectotype">Neolectotype</option>
               </select>
             </div>
           </div>
@@ -288,12 +288,8 @@
     var dwcQuery = {};
     var wildcardAttrs = [];
     Object.keys(state.filters).forEach(function (k) {
-      if (k === 'typeStatus') {
-        dwcQuery[k] = state.filters[k];
-      } else {
-        dwcQuery[k] = state.filters[k];
-        wildcardAttrs.push(k);
-      }
+      dwcQuery[k] = state.filters[k];
+      wildcardAttrs.push(k);
     });
     if (wildcardAttrs.length) dwcQuery.wildcard_attribute = wildcardAttrs;
 
