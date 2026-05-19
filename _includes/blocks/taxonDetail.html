@@ -241,14 +241,15 @@
 
   function nameHtml(node) {
     if (node == null) return '';
-    if (typeof node === 'string' || typeof node === 'number') return escapeHtml(String(node));
+    if (typeof node === 'string' || typeof node === 'number') return sanitizeNameHtml(String(node));
     var inner = node.taxon_name || node.taxonName || node.otu;
-    var htmlSource = node.object_tag || node.cached_html || node.full_name_tag ||
-      (inner && (inner.object_tag || inner.cached_html || inner.full_name_tag));
+    // The taxonomy.json `name` field also contains HTML (with <i> tags).
+    var htmlSource = node.object_tag || node.cached_html || node.full_name_tag || node.name ||
+      (inner && (inner.object_tag || inner.cached_html || inner.full_name_tag || inner.name));
     if (htmlSource) return sanitizeNameHtml(htmlSource);
     return escapeHtml(
-      node.name || node.cached || node.full_name || node.label ||
-      (inner && (inner.name || inner.cached || inner.full_name)) ||
+      node.cached || node.full_name || node.label ||
+      (inner && (inner.cached || inner.full_name)) ||
       node._rankKey ||
       ('#' + (node.otu_id || node.id || ''))
     );
