@@ -58,7 +58,10 @@
     min-height: 1em;
   }
   .taxonDetail__title { margin-bottom: 0.75rem; }
-  .taxonDetail__title em { font-style: italic; }
+  .taxonDetail__title i,
+  .taxonDetail__breadcrumb i,
+  .taxonDetail__tree i,
+  .taxonDetail__gbifCard i { font-style: italic; }
   .taxonDetail__breadcrumb { margin-bottom: 0; font-size: 0.9rem; }
   .taxonDetail__breadcrumb ul { flex-wrap: wrap; }
   .taxonDetail__breadcrumb .taxonDetail__current { color: #555; }
@@ -191,6 +194,12 @@
       .replace(/'/g, '&#39;');
   }
 
+  // Only <i> and </i> are allowed inside taxon-name HTML. Everything else
+  // is escaped to plain text.
+  function sanitizeNameHtml(html) {
+    return escapeHtml(html).replace(/&lt;(\/?)i&gt;/gi, '<$1i>');
+  }
+
   function stripTags(html) {
     var tmp = document.createElement('div');
     tmp.innerHTML = html == null ? '' : String(html);
@@ -233,16 +242,16 @@
   function nameHtml(node) {
     if (node == null) return '';
     if (typeof node === 'string' || typeof node === 'number') return escapeHtml(String(node));
-    // Sometimes the parent wraps the actual taxon under one of these keys.
     var inner = node.taxon_name || node.taxonName || node.otu;
-    return node.object_tag || node.cached_html || node.full_name_tag ||
-      (inner && (inner.object_tag || inner.cached_html || inner.full_name_tag)) ||
-      escapeHtml(
-        node.name || node.cached || node.full_name || node.label ||
-        (inner && (inner.name || inner.cached || inner.full_name)) ||
-        node._rankKey ||
-        ('#' + (node.otu_id || node.id || ''))
-      );
+    var htmlSource = node.object_tag || node.cached_html || node.full_name_tag ||
+      (inner && (inner.object_tag || inner.cached_html || inner.full_name_tag));
+    if (htmlSource) return sanitizeNameHtml(htmlSource);
+    return escapeHtml(
+      node.name || node.cached || node.full_name || node.label ||
+      (inner && (inner.name || inner.cached || inner.full_name)) ||
+      node._rankKey ||
+      ('#' + (node.otu_id || node.id || ''))
+    );
   }
 
   function plainName(node) {
@@ -445,11 +454,11 @@
         : '';
 
       var synonymHtml = isSynonym
-        ? '<p class="is-size-7 has-text-grey">Synonym: <span>' + (data.usage.formattedName || escapeHtml(data.usage.name || '')) + '</span></p>'
+        ? '<p class="is-size-7 has-text-grey">Synonym: <span>' + (data.usage.formattedName ? sanitizeNameHtml(data.usage.formattedName) : escapeHtml(data.usage.name || '')) + '</span></p>'
         : '';
 
       gbifBodyEl.innerHTML =
-        '<p class="taxonDetail__gbifName">' + (target.formattedName || escapeHtml(target.name || '')) + '</p>' +
+        '<p class="taxonDetail__gbifName">' + (target.formattedName ? sanitizeNameHtml(target.formattedName) : escapeHtml(target.name || '')) + '</p>' +
         synonymHtml +
         classificationHtml +
         '<p class="gbif__count" id="taxonDetailGbifCount"><span class="has-text-grey">Loading occurrences…</span></p>';
@@ -505,7 +514,8 @@
             .then(function (taxon) {
               if (window.console) console.log('taxon', taxon);
               safe(function () {
-                titleEl.innerHTML = taxon.full_name_tag || taxon.cached_html || escapeHtml(taxon.full_name || taxon.cached || ('Taxon #' + otu.id));
+                var titleHtml = taxon.full_name_tag || taxon.cached_html;
+                titleEl.innerHTML = titleHtml ? sanitizeNameHtml(titleHtml) : escapeHtml(taxon.full_name || taxon.cached || ('Taxon #' + otu.id));
                 rankEl.textContent = deriveRankLabel(taxon);
               });
               safe(function () { renderBreadcrumb(parents, taxon); });
@@ -513,12 +523,12 @@
             })
             .catch(function (err) {
               if (window.console) console.error('taxon_names failed', err);
-              safe(function () { titleEl.innerHTML = escapeHtml(otu.object_tag || ('Otu #' + otu.id)); });
+              safe(function () { titleEl.innerHTML = otu.object_tag ? sanitizeNameHtml(otu.object_tag) : escapeHtml('Otu #' + otu.id); });
               safe(function () { renderBreadcrumb(parents, { name: otu.object_tag }); });
               safe(function () { renderGbifPanel(stripTags(otu.object_tag || '')); });
             });
         }
-        safe(function () { titleEl.innerHTML = otu.object_tag || ('Otu #' + escapeHtml(String(otu.id))); });
+        safe(function () { titleEl.innerHTML = otu.object_tag ? sanitizeNameHtml(otu.object_tag) : ('Otu #' + escapeHtml(String(otu.id))); });
         safe(function () { renderBreadcrumb(parents, { name: otu.object_tag }); });
         safe(function () { renderGbifPanel(stripTags(otu.object_tag || '')); });
       })
