@@ -215,7 +215,27 @@
   }
 
   function sanitizeNameHtml(html) {
-    return escapeHtml(html).replace(/&lt;(\/?)i&gt;/gi, '<$1i>');
+    if (html == null) return '';
+    var tmp = document.createElement('div');
+    tmp.innerHTML = String(html);
+    return extractAllowed(tmp);
+  }
+
+  function extractAllowed(node) {
+    var out = '';
+    for (var i = 0; i < node.childNodes.length; i++) {
+      var child = node.childNodes[i];
+      if (child.nodeType === 3) {
+        out += escapeHtml(child.nodeValue);
+      } else if (child.nodeType === 1) {
+        if (child.tagName && child.tagName.toLowerCase() === 'i') {
+          out += '<i>' + extractAllowed(child) + '</i>';
+        } else {
+          out += extractAllowed(child);
+        }
+      }
+    }
+    return out;
   }
 
   function nameOfItem(item) {
