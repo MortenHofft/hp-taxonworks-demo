@@ -1,0 +1,586 @@
+{% assign apiUrl = include.content.apiUrl | default: "https://sfg.taxonworks.org/api/v1" %}
+{% assign projectToken = include.content.projectToken | default: "" %}
+{% assign graphqlEndpoint = site.graphqlEndpoint | default: "https://graphql.gbif.org/graphql" %}
+
+<div class="taxonDetail">
+  <header class="taxonDetail__hero">
+    <div class="container">
+      <p class="taxonDetail__back">
+        <a href="/taxa/search">&larr; Back to search</a>
+      </p>
+      <p id="taxonDetailRank" class="taxonDetail__rank"></p>
+      <h1 id="taxonDetailTitle" class="title is-3 taxonDetail__title">Loading…</h1>
+      <nav id="taxonDetailBreadcrumb" class="breadcrumb has-arrow-separator taxonDetail__breadcrumb" aria-label="Taxonomic hierarchy"></nav>
+      <div id="taxonDetailStatus" class="notification is-danger is-light is-hidden"></div>
+    </div>
+  </header>
+
+  <section class="taxonDetail__body">
+    <div class="container">
+      <div class="columns is-variable is-5 taxonDetail__panels">
+        <div class="column is-7">
+          <div class="card taxonDetail__card">
+            <header class="card-header">
+              <p class="card-header-title">Children</p>
+            </header>
+            <div class="card-content">
+              <div id="taxonDetailChildren" class="taxonDetail__tree">Loading…</div>
+            </div>
+          </div>
+        </div>
+        <div class="column is-5">
+          <div id="taxonDetailGbif" class="card taxonDetail__card taxonDetail__gbifCard">
+            <header class="card-header">
+              <p class="card-header-title">This taxon in GBIF</p>
+            </header>
+            <div class="card-content">
+              <div id="taxonDetailGbifBody">Loading…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<style>
+  .taxonDetail__hero {
+    background: #fff;
+    padding: 2.5rem 0 1.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  .taxonDetail__back { margin-bottom: 0.75rem; font-size: 0.9rem; }
+  .taxonDetail__rank {
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    color: #666;
+    margin-bottom: 0.25rem;
+    min-height: 1em;
+  }
+  .taxonDetail__title { margin-bottom: 0.75rem; }
+  .taxonDetail__title i,
+  .taxonDetail__breadcrumb i,
+  .taxonDetail__tree i,
+  .taxonDetail__gbifCard i { font-style: italic; }
+  .taxonDetail__breadcrumb { margin-bottom: 0; font-size: 0.9rem; }
+  .taxonDetail__breadcrumb ul { flex-wrap: wrap; }
+  .taxonDetail__breadcrumb .taxonDetail__current { color: #555; }
+
+  .taxonDetail__body {
+    background: #f5f5f7;
+    padding: 2rem 0 3rem;
+    min-height: 50vh;
+  }
+  .taxonDetail__panels { margin-top: 0; }
+
+  .taxonDetail__tree ul {
+    list-style: none !important;
+    margin: 0;
+    padding-left: 1rem;
+  }
+  .taxonDetail__tree > ul { padding-left: 0; }
+  .taxonDetail__tree li::marker { content: ''; }
+  .taxonDetail__tree li {
+    position: relative;
+    padding: 0.2rem 0 0.2rem 0.5rem;
+    margin: 0;
+    border-left: 1px solid #ddd;
+  }
+  .taxonDetail__tree > ul > li:first-child { border-left: 0; padding-left: 0; }
+  .taxonDetail__tree li:last-child { border-left-color: transparent; }
+  .taxonDetail__tree li:before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.7em;
+    width: 0.5rem;
+    border-top: 1px solid #ddd;
+  }
+  .taxonDetail__tree > ul > li:first-child:before { display: none; }
+  .taxonDetail__tree li:last-child:before { border-left: 1px solid #ddd; height: 0.7em; top: 0; }
+  .taxonDetail__tree .taxonDetail__nodeRow {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .taxonDetail__tree .taxonDetail__expand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+    padding: 0;
+    color: #333;
+  }
+  .taxonDetail__tree .taxonDetail__expand[disabled] { visibility: hidden; }
+  .taxonDetail__tree .taxonDetail__expand:hover { background: #f5f5f5; }
+  .taxonDetail__tree .taxonDetail__leafDot {
+    display: inline-block;
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: #ccc;
+    margin-right: 0.35rem;
+  }
+  .taxonDetail__tree .taxonDetail__synonyms {
+    list-style: none;
+    padding-left: 1.5rem;
+    margin: 0.15rem 0 0.4rem;
+    color: #777;
+    font-size: 0.85rem;
+  }
+  .taxonDetail__tree .taxonDetail__synonyms li:before { display: none; }
+  .taxonDetail__tree .taxonDetail__synonyms li { border-left: 0; padding: 0.05rem 0; }
+
+  .taxonDetail__gbifCard .gbif__classification {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    font-size: 0.78rem;
+    color: #555;
+  }
+  .taxonDetail__gbifCard .gbif__classification li:after {
+    content: "›";
+    margin-left: 0.4rem;
+    color: #aaa;
+  }
+  .taxonDetail__gbifCard .gbif__classification li:last-child:after { content: ""; }
+  .taxonDetail__gbifCard .gbif__rank {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    color: #888;
+    margin-right: 0.25rem;
+  }
+  .taxonDetail__gbifCard .gbif__count {
+    font-size: 0.9rem;
+    margin-top: 0.6rem;
+  }
+  .taxonDetail__gbifCard .gbif__count strong { font-size: 1rem; }
+</style>
+
+<script>
+(function () {
+  var API_URL = {{ apiUrl | jsonify }};
+  var PROJECT_TOKEN = {{ projectToken | jsonify }};
+  var GRAPHQL_ENDPOINT = {{ graphqlEndpoint | jsonify }};
+  var GBIF_CHECKLIST_KEY = 'd7dddbf4-2cf0-4f39-9b2a-bb099caae36c';
+  var SITE_OCCURRENCE_PREDICATE = (typeof siteConfig !== 'undefined' && siteConfig && siteConfig.occurrenceSearch && siteConfig.occurrenceSearch.scope) || null;
+
+  var titleEl = document.getElementById('taxonDetailTitle');
+  var rankEl = document.getElementById('taxonDetailRank');
+  var breadcrumbEl = document.getElementById('taxonDetailBreadcrumb');
+  var childrenEl = document.getElementById('taxonDetailChildren');
+  var statusEl = document.getElementById('taxonDetailStatus');
+  var gbifBodyEl = document.getElementById('taxonDetailGbifBody');
+
+  function setError(msg) {
+    if (!msg) { statusEl.className = 'notification is-danger is-light is-hidden'; statusEl.textContent = ''; }
+    else { statusEl.className = 'notification is-danger is-light'; statusEl.textContent = msg; }
+  }
+
+  function escapeHtml(s) {
+    return (s == null ? '' : String(s))
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Only <i> and </i> are allowed inside taxon-name HTML. Other tags are
+  // stripped but their text content is preserved.
+  function sanitizeNameHtml(html) {
+    if (html == null) return '';
+    var tmp = document.createElement('div');
+    tmp.innerHTML = String(html);
+    return extractAllowed(tmp);
+  }
+
+  function extractAllowed(node) {
+    var out = '';
+    for (var i = 0; i < node.childNodes.length; i++) {
+      var child = node.childNodes[i];
+      if (child.nodeType === 3) {
+        out += escapeHtml(child.nodeValue);
+      } else if (child.nodeType === 1) {
+        if (child.tagName && child.tagName.toLowerCase() === 'i') {
+          out += '<i>' + extractAllowed(child) + '</i>';
+        } else {
+          out += extractAllowed(child);
+        }
+      }
+    }
+    return out;
+  }
+
+  function stripTags(html) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html == null ? '' : String(html);
+    return (tmp.textContent || tmp.innerText || '').trim();
+  }
+
+  function getOtuId() {
+    return new URLSearchParams(window.location.search).get('id');
+  }
+
+  function toArray(x) {
+    if (Array.isArray(x)) return x;
+    if (x && typeof x === 'object') {
+      return Object.keys(x).map(function (k) {
+        var v = x[k];
+        if (v == null) return null;
+        if (typeof v === 'string' || typeof v === 'number') {
+          return { name: String(v), _rankKey: k };
+        }
+        if (typeof v === 'object') {
+          var wrap = { _rankKey: k };
+          for (var prop in v) if (Object.prototype.hasOwnProperty.call(v, prop)) wrap[prop] = v[prop];
+          return wrap;
+        }
+        return null;
+      }).filter(Boolean);
+    }
+    return [];
+  }
+
+  function apiFetch(path) {
+    var sep = path.indexOf('?') === -1 ? '?' : '&';
+    var url = API_URL.replace(/\/$/, '') + path + sep + 'project_token=' + encodeURIComponent(PROJECT_TOKEN);
+    return fetch(url, { headers: { Accept: 'application/json' } }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + path);
+      return res.json();
+    });
+  }
+
+  function nameHtml(node) {
+    if (node == null) return '';
+    if (typeof node === 'string' || typeof node === 'number') return sanitizeNameHtml(String(node));
+    var inner = node.taxon_name || node.taxonName || node.otu;
+    // The taxonomy.json `name` field also contains HTML (with <i> tags).
+    var htmlSource = node.object_tag || node.cached_html || node.full_name_tag || node.name ||
+      (inner && (inner.object_tag || inner.cached_html || inner.full_name_tag || inner.name));
+    if (htmlSource) return sanitizeNameHtml(htmlSource);
+    return escapeHtml(
+      node.cached || node.full_name || node.label ||
+      (inner && (inner.cached || inner.full_name)) ||
+      node._rankKey ||
+      ('#' + (node.otu_id || node.id || ''))
+    );
+  }
+
+  function plainName(node) {
+    if (node == null) return '';
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
+    return stripTags(node.cached_html || node.full_name_tag || node.name || node.cached || node.full_name || node.object_tag || '');
+  }
+
+  function otuIdOf(node) {
+    return node.otu_id != null ? node.otu_id : node.id;
+  }
+
+  function linkItem(node) {
+    var id = otuIdOf(node);
+    var html = nameHtml(node);
+    if (id == null) return '<span>' + html + '</span>';
+    return '<a href="/taxon/key?id=' + encodeURIComponent(id) + '">' + html + '</a>';
+  }
+
+  // ---- Rank ----
+  function deriveRankLabel(taxon) {
+    if (!taxon) return '';
+    if (taxon.rank) return taxon.rank;
+    if (taxon.rank_string) {
+      var parts = String(taxon.rank_string).split('::');
+      return parts[parts.length - 1] || '';
+    }
+    return '';
+  }
+
+  // ---- Breadcrumb ----
+  // TaxonWorks returns `otu.parents` as an object map: { "Animalia": [{id, ...}], "Chordata": [...], ... }
+  // where the key is the displayed name and the first item in the array has the otu id.
+  function breadcrumbEntries(parents) {
+    if (Array.isArray(parents)) {
+      return parents.map(function (p) {
+        return {
+          name: plainName(p) || nameHtml(p),
+          html: nameHtml(p),
+          otuId: otuIdOf(p || {})
+        };
+      });
+    }
+    if (parents && typeof parents === 'object') {
+      var out = [];
+      Object.keys(parents).forEach(function (name) {
+        var v = parents[name];
+        var first = Array.isArray(v) ? v[0] : v;
+        var otuId = first && (first.id != null ? first.id : first.otu_id);
+        out.push({ name: name, html: escapeHtml(name), otuId: otuId });
+      });
+      return out;
+    }
+    return [];
+  }
+
+  function renderBreadcrumb(parents, current) {
+    var items = breadcrumbEntries(parents).map(function (e) {
+      if (e.otuId != null) {
+        return '<li><a href="/taxon/key?id=' + encodeURIComponent(e.otuId) + '">' + e.html + '</a></li>';
+      }
+      return '<li><span>' + e.html + '</span></li>';
+    });
+    if (current) {
+      items.push('<li class="is-active"><span class="taxonDetail__current">' + nameHtml(current) + '</span></li>');
+    }
+    breadcrumbEl.innerHTML = items.length ? '<ul>' + items.join('') + '</ul>' : '';
+  }
+
+  // ---- Expandable children tree ----
+  function renderChildrenTree(rootDescendants) {
+    if (!rootDescendants || !rootDescendants.length) {
+      childrenEl.innerHTML = '<p class="has-text-grey">No children.</p>';
+      return;
+    }
+    childrenEl.innerHTML = buildTreeListHtml(rootDescendants);
+  }
+
+  function buildTreeListHtml(nodes) {
+    return '<ul>' + nodes.map(buildTreeItemHtml).join('') + '</ul>';
+  }
+
+  function buildTreeItemHtml(node) {
+    var id = otuIdOf(node);
+    var expandable = !node.leaf_node && id != null;
+    var expandBtn = expandable
+      ? '<button type="button" class="taxonDetail__expand" data-action="expand" data-otu-id="' + escapeHtml(id) + '" aria-expanded="false" title="Expand">+</button>'
+      : '<span class="taxonDetail__leafDot" aria-hidden="true"></span>';
+    var syn = (node.nomenclatural_synonyms && node.nomenclatural_synonyms.length)
+      ? '<ul class="taxonDetail__synonyms">' + node.nomenclatural_synonyms.map(function (s) {
+          return '<li>= ' + nameHtml(s) + '</li>';
+        }).join('') + '</ul>'
+      : '';
+    return '<li data-otu-id="' + escapeHtml(id == null ? '' : id) + '">' +
+      '<div class="taxonDetail__nodeRow">' + expandBtn + linkItem(node) + '</div>' +
+      syn +
+      '<div class="taxonDetail__childrenContainer"></div>' +
+      '</li>';
+  }
+
+  childrenEl.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-action="expand"]');
+    if (!btn) return;
+    var li = btn.closest('li');
+    if (!li) return;
+    var otuId = btn.getAttribute('data-otu-id');
+    var container = li.querySelector('.taxonDetail__childrenContainer');
+    var expanded = btn.getAttribute('aria-expanded') === 'true';
+
+    if (expanded) {
+      container.style.display = 'none';
+      btn.setAttribute('aria-expanded', 'false');
+      btn.textContent = '+';
+      btn.setAttribute('title', 'Expand');
+      return;
+    }
+
+    btn.setAttribute('aria-expanded', 'true');
+    btn.textContent = '−';
+    btn.setAttribute('title', 'Collapse');
+    container.style.display = '';
+
+    if (container.dataset.loaded === '1') {
+      return;
+    }
+
+    container.innerHTML = '<p class="has-text-grey is-size-7" style="padding-left:1rem;">Loading…</p>';
+    apiFetch('/otus/' + encodeURIComponent(otuId) + '/inventory/taxonomy.json?max_descendants_depth=1')
+      .then(function (data) {
+        var kids = (data && data.descendants) || [];
+        if (!kids.length) {
+          container.innerHTML = '<p class="has-text-grey is-size-7" style="padding-left:1rem;">No children.</p>';
+        } else {
+          container.innerHTML = buildTreeListHtml(kids);
+        }
+        container.dataset.loaded = '1';
+      })
+      .catch(function (err) {
+        container.innerHTML = '<p class="has-text-danger is-size-7" style="padding-left:1rem;">Failed: ' + escapeHtml(err.message) + '</p>';
+      });
+  });
+
+  // ---- GBIF Taxon panel ----
+  var gbifMatchCache = new Map();
+
+  function gbifMatch(name) {
+    if (gbifMatchCache.has(name)) return gbifMatchCache.get(name);
+    var url = new URL('https://api.gbif.org/v2/species/match');
+    url.searchParams.set('scientificName', name);
+    url.searchParams.set('verbose', 'true');
+    url.searchParams.set('checklistKey', GBIF_CHECKLIST_KEY);
+    var p = fetch(url.toString()).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+    gbifMatchCache.set(name, p);
+    return p;
+  }
+
+  function isConfidentMatch(data) {
+    var matchType = data && data.diagnostics && data.diagnostics.matchType;
+    var confidence = (data && data.diagnostics && data.diagnostics.confidence) || 0;
+    var accepted = ['EXACT', 'FUZZY', 'HIGHERRANK'];
+    return !!(data && data.usage && data.usage.key) && accepted.indexOf(matchType) !== -1 && confidence >= 80;
+  }
+
+  function fetchOccurrenceCount(taxonKey) {
+    var taxonPredicate = { type: 'equals', key: 'taxonKey', value: String(taxonKey) };
+    var predicate = SITE_OCCURRENCE_PREDICATE
+      ? { type: 'and', predicates: [SITE_OCCURRENCE_PREDICATE, taxonPredicate] }
+      : taxonPredicate;
+    var query = 'query OccurrenceSearch($predicate: Predicate) {\n' +
+      '  occurrenceSearch(predicate: $predicate) {\n' +
+      '    documents(size: 0) { total }\n' +
+      '  }\n' +
+      '}';
+    return fetch(GRAPHQL_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ query: query, variables: { predicate: predicate } })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (d) {
+      if (d && d.errors && d.errors.length) throw new Error(d.errors[0].message || 'GraphQL error');
+      var total = d && d.data && d.data.occurrenceSearch && d.data.occurrenceSearch.documents && d.data.occurrenceSearch.documents.total;
+      return typeof total === 'number' ? total : null;
+    });
+  }
+
+  function renderGbifPanel(scientificName) {
+    if (!scientificName) {
+      gbifBodyEl.innerHTML = '<p class="has-text-grey">No name to match.</p>';
+      return;
+    }
+    gbifBodyEl.innerHTML = '<p class="has-text-grey">Looking up <em>' + escapeHtml(scientificName) + '</em> in GBIF…</p>';
+
+    gbifMatch(scientificName).then(function (data) {
+      if (!isConfidentMatch(data)) {
+        gbifBodyEl.innerHTML = '<p class="has-text-grey">No confident GBIF match for <em>' + escapeHtml(scientificName) + '</em>.</p>';
+        return;
+      }
+      var isSynonym = data.usage.status === 'SYNONYM' && data.acceptedUsage;
+      var target = isSynonym ? data.acceptedUsage : data.usage;
+      var classification = data.classification || [];
+
+      var classificationHtml = classification.length
+        ? '<ol class="gbif__classification">' + classification.map(function (r) {
+            return '<li><span class="gbif__rank">' + escapeHtml(r.rank || '') + '</span>' + escapeHtml(r.name || '') + '</li>';
+          }).join('') + '</ol>'
+        : '';
+
+      var synonymHtml = isSynonym
+        ? '<p class="is-size-7 has-text-grey">Synonym: <span>' + (data.usage.formattedName ? sanitizeNameHtml(data.usage.formattedName) : escapeHtml(data.usage.name || '')) + '</span></p>'
+        : '';
+
+      gbifBodyEl.innerHTML =
+        '<p class="taxonDetail__gbifName">' + (target.formattedName ? sanitizeNameHtml(target.formattedName) : escapeHtml(target.name || '')) + '</p>' +
+        synonymHtml +
+        classificationHtml +
+        '<p class="gbif__count" id="taxonDetailGbifCount"><span class="has-text-grey">Loading occurrences…</span></p>';
+
+      var taxonKey = target.key;
+      fetchOccurrenceCount(taxonKey).then(function (count) {
+        var countEl = document.getElementById('taxonDetailGbifCount');
+        if (!countEl) return;
+        if (typeof count !== 'number') {
+          countEl.innerHTML = '<span class="has-text-grey">Occurrence count unavailable.</span>';
+          return;
+        }
+        var occUrl = '/occurrence/search?taxonKey=' + encodeURIComponent(taxonKey);
+        countEl.innerHTML =
+          '<a href="' + occUrl + '"><strong>' + count.toLocaleString() + '</strong> occurrence' + (count === 1 ? '' : 's') + '</a>' +
+          ' on this portal';
+      }).catch(function () {
+        var countEl = document.getElementById('taxonDetailGbifCount');
+        if (countEl) countEl.innerHTML = '<span class="has-text-grey">Occurrence count unavailable.</span>';
+      });
+    }).catch(function () {
+      gbifBodyEl.innerHTML = '<p class="has-text-grey">Could not load GBIF match.</p>';
+    });
+  }
+
+  // ---- Load ----
+  function load() {
+    var otuId = getOtuId();
+    if (!otuId) {
+      titleEl.textContent = 'No taxon id in URL';
+      childrenEl.textContent = '';
+      gbifBodyEl.textContent = '';
+      return;
+    }
+    if (!PROJECT_TOKEN) {
+      titleEl.textContent = 'Taxon #' + otuId;
+      setError('No TaxonWorks project_token configured. Set projectToken in en/data/taxonKey.md.');
+      childrenEl.textContent = '';
+      gbifBodyEl.textContent = '';
+      return;
+    }
+
+    function safe(fn) {
+      try { fn(); } catch (e) { if (window.console) console.error(e); }
+    }
+
+    apiFetch('/otus/' + encodeURIComponent(otuId) + '?extend[]=parents')
+      .then(function (otu) {
+        if (window.console) console.log('otu', otu);
+        var parents = otu.parents;
+        if (otu.taxon_name_id) {
+          return apiFetch('/taxon_names/' + encodeURIComponent(otu.taxon_name_id))
+            .then(function (taxon) {
+              if (window.console) console.log('taxon', taxon);
+              safe(function () {
+                var titleHtml = taxon.full_name_tag || taxon.cached_html;
+                titleEl.innerHTML = titleHtml ? sanitizeNameHtml(titleHtml) : escapeHtml(taxon.full_name || taxon.cached || ('Taxon #' + otu.id));
+                rankEl.textContent = deriveRankLabel(taxon);
+              });
+              safe(function () { renderBreadcrumb(parents, taxon); });
+              safe(function () { renderGbifPanel(stripTags(taxon.cached || taxon.name || taxon.full_name || '')); });
+            })
+            .catch(function (err) {
+              if (window.console) console.error('taxon_names failed', err);
+              safe(function () { titleEl.innerHTML = otu.object_tag ? sanitizeNameHtml(otu.object_tag) : escapeHtml('Otu #' + otu.id); });
+              safe(function () { renderBreadcrumb(parents, { name: otu.object_tag }); });
+              safe(function () { renderGbifPanel(stripTags(otu.object_tag || '')); });
+            });
+        }
+        safe(function () { titleEl.innerHTML = otu.object_tag ? sanitizeNameHtml(otu.object_tag) : ('Otu #' + escapeHtml(String(otu.id))); });
+        safe(function () { renderBreadcrumb(parents, { name: otu.object_tag }); });
+        safe(function () { renderGbifPanel(stripTags(otu.object_tag || '')); });
+      })
+      .catch(function (err) {
+        titleEl.textContent = 'Taxon #' + otuId;
+        setError('Failed to load taxon: ' + err.message);
+      });
+
+    apiFetch('/otus/' + encodeURIComponent(otuId) + '/inventory/taxonomy.json?max_descendants_depth=1')
+      .then(function (data) {
+        renderChildrenTree(data.descendants || []);
+      })
+      .catch(function (err) {
+        childrenEl.innerHTML = '<p class="has-text-danger">Failed to load children: ' + escapeHtml(err.message) + '</p>';
+      });
+  }
+
+  load();
+})();
+</script>

@@ -1,0 +1,371 @@
+{% assign apiUrl = include.content.apiUrl | default: "https://sfg.taxonworks.org/api/v1" %}
+{% assign projectToken = include.content.projectToken | default: "" %}
+{% assign perPage = include.content.perPage | default: 25 %}
+
+<div class="taxaSearch">
+  <header class="taxaSearch__hero">
+    <div class="container">
+      <h1 class="title is-5 taxaSearch__title">Taxa search</h1>
+      <form id="taxaSearchForm" class="taxaSearch__form">
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_scientificName">Scientific name</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_scientificName" type="text" name="scientificName" placeholder="e.g. Apis">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_scientificNameAuthorship">Author</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_scientificNameAuthorship" type="text" name="scientificNameAuthorship" placeholder="e.g. Linnaeus">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_family">Family</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_family" type="text" name="family">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_genus">Genus</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_genus" type="text" name="genus">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_country">Country</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_country" type="text" name="country">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_typeStatus">Type status</label>
+          <div class="control">
+            <div class="select is-small is-fullwidth">
+              <select id="taxaSearch_typeStatus" name="typeStatus">
+                <option value="">Any</option>
+                <option value="Holotype">Holotype</option>
+                <option value="Lectotype">Lectotype</option>
+                <option value="Syntype">Syntype</option>
+                <option value="Paratype">Paratype</option>
+                <option value="Paralectotype">Paralectotype</option>
+                <option value="Neotype">Neotype</option>
+                <option value="Neolectotype">Neolectotype</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field taxaSearch__actions">
+          <div class="control buttons">
+            <button type="submit" class="button is-primary is-small">Search</button>
+            <button type="reset" class="button is-primary is-outlined is-small">Reset</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </header>
+
+  <section class="taxaSearch__body">
+    <div class="container">
+      <div id="taxaSearchStatus" class="taxaSearch__status"></div>
+      <div class="card taxaSearch__card">
+        <div class="card-content taxaSearch__cardContent">
+          <ul id="taxaSearchResults" class="taxaSearch__results"></ul>
+        </div>
+      </div>
+      <nav id="taxaSearchPagination" class="taxaSearch__pagination"></nav>
+    </div>
+  </section>
+</div>
+
+<style>
+  .taxaSearch__hero {
+    background: #fff;
+    padding: 2rem 0 1.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  .taxaSearch__title { margin-bottom: 1rem; }
+  .taxaSearch__form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.6rem 1rem;
+    align-items: end;
+  }
+  .taxaSearch__actions { align-self: end; }
+  .taxaSearch__actions .buttons { margin-bottom: 0; }
+
+  .taxaSearch__body {
+    background: #f5f5f7;
+    padding: 2rem 0 3rem;
+    min-height: 50vh;
+  }
+  .taxaSearch__status {
+    margin: 0 0 0.75rem;
+    color: #555;
+    font-size: 0.9rem;
+    min-height: 1.2em;
+  }
+  .taxaSearch__card { box-shadow: 0 2px 3px rgba(10,10,10,0.05), 0 0 0 1px rgba(10,10,10,0.05); }
+  .taxaSearch__cardContent { padding: 0.25rem 0.75rem; }
+  .taxaSearch__results { list-style: none; padding: 0; margin: 0; }
+  .taxaSearch__results li {
+    padding: 0.65rem 0.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  .taxaSearch__results li:last-child { border-bottom: 0; }
+  .taxaSearch__results a { text-decoration: none; color: inherit; }
+  .taxaSearch__results a:hover { text-decoration: underline; }
+  .taxaSearch__results i { font-style: italic; }
+  .taxaSearch__pagination {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+</style>
+
+<script>
+(function () {
+  var API_URL = {{ apiUrl | jsonify }};
+  var PROJECT_TOKEN = {{ projectToken | jsonify }};
+  var PER_PAGE = parseInt({{ perPage | jsonify }}, 10) || 25;
+
+  var form = document.getElementById('taxaSearchForm');
+  var resultsEl = document.getElementById('taxaSearchResults');
+  var statusEl = document.getElementById('taxaSearchStatus');
+  var paginationEl = document.getElementById('taxaSearchPagination');
+
+  var FILTER_KEYS = ['scientificName', 'scientificNameAuthorship', 'family', 'genus', 'country', 'typeStatus'];
+
+  var state = {
+    page: 1,
+    total: 0,
+    perPage: PER_PAGE,
+    filters: {}
+  };
+
+  function readUrl() {
+    var sp = new URLSearchParams(window.location.search);
+    var filters = {};
+    FILTER_KEYS.forEach(function (k) {
+      var v = sp.get(k);
+      if (v) filters[k] = v;
+    });
+    var page = parseInt(sp.get('page'), 10);
+    return { filters: filters, page: isNaN(page) || page < 1 ? 1 : page };
+  }
+
+  function writeUrl() {
+    var sp = new URLSearchParams();
+    Object.keys(state.filters).forEach(function (k) {
+      if (state.filters[k]) sp.set(k, state.filters[k]);
+    });
+    if (state.page > 1) sp.set('page', state.page);
+    var qs = sp.toString();
+    var newUrl = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    history.replaceState(null, '', newUrl);
+  }
+
+  function applyFiltersToForm(filters) {
+    FILTER_KEYS.forEach(function (k) {
+      var el = form.elements[k];
+      if (el) el.value = filters[k] || '';
+    });
+  }
+
+  function flattenParams(params) {
+    var parts = [];
+    function add(key, val) {
+      if (val === null || val === undefined || val === '') return;
+      if (Array.isArray(val)) {
+        val.forEach(function (v) { add(key + '[]', v); });
+      } else if (typeof val === 'object') {
+        Object.keys(val).forEach(function (k) { add(key + '[' + k + ']', val[k]); });
+      } else {
+        parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(val));
+      }
+    }
+    Object.keys(params).forEach(function (k) { add(k, params[k]); });
+    return parts.join('&');
+  }
+
+  function readFilters() {
+    var data = new FormData(form);
+    var filters = {};
+    data.forEach(function (value, key) {
+      var v = (value || '').toString().trim();
+      if (v) filters[key] = v;
+    });
+    return filters;
+  }
+
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg || '';
+    statusEl.style.color = isError ? '#c00' : '#555';
+  }
+
+  function escapeHtml(s) {
+    return (s == null ? '' : String(s))
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function sanitizeNameHtml(html) {
+    if (html == null) return '';
+    var tmp = document.createElement('div');
+    tmp.innerHTML = String(html);
+    return extractAllowed(tmp);
+  }
+
+  function extractAllowed(node) {
+    var out = '';
+    for (var i = 0; i < node.childNodes.length; i++) {
+      var child = node.childNodes[i];
+      if (child.nodeType === 3) {
+        out += escapeHtml(child.nodeValue);
+      } else if (child.nodeType === 1) {
+        if (child.tagName && child.tagName.toLowerCase() === 'i') {
+          out += '<i>' + extractAllowed(child) + '</i>';
+        } else {
+          out += extractAllowed(child);
+        }
+      }
+    }
+    return out;
+  }
+
+  function nameOfItem(item) {
+    var raw = item.object_tag || item.cached || item.name;
+    if (raw) return sanitizeNameHtml(raw);
+    return escapeHtml('Otu #' + item.id);
+  }
+
+  function renderResults(items) {
+    if (!items || !items.length) {
+      resultsEl.innerHTML = '<li class="has-text-grey">No results.</li>';
+      return;
+    }
+    resultsEl.innerHTML = items.map(function (item) {
+      return '<li>' +
+        '<a href="/taxon/key?id=' + encodeURIComponent(item.id) + '">' +
+        nameOfItem(item) +
+        ' <span class="has-text-grey is-size-7">(id: ' + escapeHtml(item.id) + ')</span>' +
+        '</a></li>';
+    }).join('');
+  }
+
+  function renderPagination() {
+    var totalPages = state.perPage > 0 ? Math.max(1, Math.ceil(state.total / state.perPage)) : 1;
+    if (state.total === 0) {
+      paginationEl.innerHTML = '';
+      return;
+    }
+    var btn = function (label, page, disabled) {
+      return '<button type="button" class="button is-small is-primary is-outlined" data-page="' + page + '"' +
+        (disabled ? ' disabled' : '') + '>' + label + '</button>';
+    };
+    paginationEl.innerHTML =
+      btn('« First', 1, state.page <= 1) +
+      btn('‹ Prev', state.page - 1, state.page <= 1) +
+      '<span class="is-size-7 has-text-grey">Page ' + state.page + ' of ' + totalPages +
+        ' · ' + state.total.toLocaleString() + ' results</span>' +
+      btn('Next ›', state.page + 1, state.page >= totalPages) +
+      btn('Last »', totalPages, state.page >= totalPages);
+  }
+
+  function fetchResults() {
+    if (!PROJECT_TOKEN) {
+      setStatus('No TaxonWorks project_token configured. Set `projectToken` in the taxaSearch block inlineData (en/data/taxa.md).', true);
+      resultsEl.innerHTML = '';
+      paginationEl.innerHTML = '';
+      return;
+    }
+
+    var dwcQuery = {};
+    var wildcardAttrs = [];
+    Object.keys(state.filters).forEach(function (k) {
+      if (k === 'typeStatus') {
+        dwcQuery[k] = state.filters[k];
+      } else {
+        dwcQuery[k] = state.filters[k];
+        wildcardAttrs.push(k);
+      }
+    });
+    if (wildcardAttrs.length) dwcQuery.wildcard_attribute = wildcardAttrs;
+
+    var params = {
+      project_token: PROJECT_TOKEN,
+      page: state.page,
+      per: state.perPage,
+      dwc_occurrence_query: dwcQuery
+    };
+
+    var url = API_URL.replace(/\/$/, '') + '/otus/inventory/alphabetical?' + flattenParams(params);
+
+    setStatus('Loading…');
+    resultsEl.innerHTML = '';
+
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var total = parseInt(res.headers.get('pagination-total') || '0', 10);
+        var per = parseInt(res.headers.get('pagination-per-page') || state.perPage, 10);
+        var page = parseInt(res.headers.get('pagination-page') || state.page, 10);
+        state.total = isNaN(total) ? 0 : total;
+        state.perPage = isNaN(per) || per <= 0 ? state.perPage : per;
+        state.page = isNaN(page) || page <= 0 ? state.page : page;
+        return res.json();
+      })
+      .then(function (items) {
+        setStatus('');
+        renderResults(items);
+        renderPagination();
+      })
+      .catch(function (err) {
+        setStatus('Request failed: ' + err.message, true);
+        resultsEl.innerHTML = '';
+        paginationEl.innerHTML = '';
+      });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    state.filters = readFilters();
+    state.page = 1;
+    writeUrl();
+    fetchResults();
+  });
+
+  form.addEventListener('reset', function () {
+    setTimeout(function () {
+      state.filters = {};
+      state.page = 1;
+      writeUrl();
+      fetchResults();
+    }, 0);
+  });
+
+  paginationEl.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.tagName === 'BUTTON' && t.dataset.page) {
+      var p = parseInt(t.dataset.page, 10);
+      if (!isNaN(p) && p >= 1) {
+        state.page = p;
+        writeUrl();
+        fetchResults();
+        window.scrollTo({ top: form.offsetTop - 20, behavior: 'smooth' });
+      }
+    }
+  });
+
+  var initial = readUrl();
+  state.filters = initial.filters;
+  state.page = initial.page;
+  applyFiltersToForm(state.filters);
+  fetchResults();
+})();
+</script>
