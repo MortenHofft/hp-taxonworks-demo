@@ -1,48 +1,54 @@
 {% assign apiUrl = include.content.apiUrl | default: "https://sfg.taxonworks.org/api/v1" %}
 {% assign projectToken = include.content.projectToken | default: "" %}
 
-<section class="section taxonDetail">
-  <div class="container">
-    <p class="taxonDetail__back">
-      <a href="/taxa/search">&larr; Back to search</a>
-    </p>
-
-    <header class="taxonDetail__header">
+<div class="taxonDetail">
+  <header class="taxonDetail__hero">
+    <div class="container">
+      <p class="taxonDetail__back">
+        <a href="/taxa/search">&larr; Back to search</a>
+      </p>
       <p id="taxonDetailRank" class="taxonDetail__rank"></p>
       <h1 id="taxonDetailTitle" class="title is-3 taxonDetail__title">Loading…</h1>
-      <nav id="taxonDetailBreadcrumb" class="taxonDetail__breadcrumb" aria-label="Taxonomic hierarchy"></nav>
-    </header>
+      <nav id="taxonDetailBreadcrumb" class="breadcrumb has-arrow-separator taxonDetail__breadcrumb" aria-label="Taxonomic hierarchy"></nav>
+      <div id="taxonDetailStatus" class="notification is-danger is-light is-hidden"></div>
+    </div>
+  </header>
 
-    <div id="taxonDetailStatus" class="notification is-danger is-light is-hidden"></div>
-
-    <div class="columns is-variable is-5 taxonDetail__panels">
-      <div class="column is-7">
-        <div class="card taxonDetail__card">
-          <header class="card-header">
-            <p class="card-header-title">Children</p>
-          </header>
-          <div class="card-content">
-            <div id="taxonDetailChildren" class="content taxonDetail__tree">Loading…</div>
+  <section class="taxonDetail__body">
+    <div class="container">
+      <div class="columns is-variable is-5 taxonDetail__panels">
+        <div class="column is-7">
+          <div class="card taxonDetail__card">
+            <header class="card-header">
+              <p class="card-header-title">Children</p>
+            </header>
+            <div class="card-content">
+              <div id="taxonDetailChildren" class="content taxonDetail__tree">Loading…</div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="column is-5">
-        <div id="taxonDetailGbif" class="card taxonDetail__card taxonDetail__gbifCard">
-          <header class="card-header">
-            <p class="card-header-title">This taxon in GBIF</p>
-          </header>
-          <div class="card-content">
-            <div id="taxonDetailGbifBody">Loading…</div>
+        <div class="column is-5">
+          <div id="taxonDetailGbif" class="card taxonDetail__card taxonDetail__gbifCard">
+            <header class="card-header">
+              <p class="card-header-title">This taxon in GBIF</p>
+            </header>
+            <div class="card-content">
+              <div id="taxonDetailGbifBody">Loading…</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
+</div>
 
 <style>
-  .taxonDetail__back { margin-bottom: 1rem; font-size: 0.9rem; }
-  .taxonDetail__header { margin-bottom: 1.5rem; }
+  .taxonDetail__hero {
+    background: #fff;
+    padding: 2.5rem 0 1.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  .taxonDetail__back { margin-bottom: 0.75rem; font-size: 0.9rem; }
   .taxonDetail__rank {
     text-transform: uppercase;
     font-size: 0.78rem;
@@ -53,14 +59,16 @@
   }
   .taxonDetail__title { margin-bottom: 0.75rem; }
   .taxonDetail__title em { font-style: italic; }
-  .taxonDetail__breadcrumb ol {
-    list-style: none;
-    margin: 0;
-    padding-left: 1rem;
-    border-left: 2px solid #eee;
+  .taxonDetail__breadcrumb { margin-bottom: 0; font-size: 0.9rem; }
+  .taxonDetail__breadcrumb ul { flex-wrap: wrap; }
+  .taxonDetail__breadcrumb .taxonDetail__current { color: #555; }
+
+  .taxonDetail__body {
+    background: #f5f5f7;
+    padding: 2rem 0 3rem;
+    min-height: 50vh;
   }
-  .taxonDetail__breadcrumb > ol { padding-left: 0; border-left: 0; }
-  .taxonDetail__breadcrumb li { padding: 0.15rem 0; font-size: 0.9rem; }
+  .taxonDetail__panels { margin-top: 0; }
 
   .taxonDetail__tree ul {
     list-style: none;
@@ -232,17 +240,19 @@
   }
 
   // ---- Breadcrumb ----
-  function renderBreadcrumb(parents) {
-    if (!parents || !parents.length) {
+  function renderBreadcrumb(parents, current) {
+    var items = [];
+    (parents || []).forEach(function (p) {
+      items.push('<li>' + linkItem(p) + '</li>');
+    });
+    if (current) {
+      items.push('<li class="is-active"><span class="taxonDetail__current">' + nameHtml(current) + '</span></li>');
+    }
+    if (!items.length) {
       breadcrumbEl.innerHTML = '';
       return;
     }
-    var html = '', closing = '';
-    parents.forEach(function (p) {
-      html += '<ol><li>' + linkItem(p);
-      closing = '</li></ol>' + closing;
-    });
-    breadcrumbEl.innerHTML = html + closing;
+    breadcrumbEl.innerHTML = '<ul>' + items.join('') + '</ul>';
   }
 
   // ---- Expandable children tree ----
@@ -427,20 +437,23 @@
 
     apiFetch('/otus/' + encodeURIComponent(otuId) + '?extend[]=parents')
       .then(function (otu) {
-        renderBreadcrumb(otu.parents || []);
+        var parents = otu.parents || [];
         if (otu.taxon_name_id) {
           return apiFetch('/taxon_names/' + encodeURIComponent(otu.taxon_name_id))
             .then(function (taxon) {
               titleEl.innerHTML = taxon.full_name_tag || taxon.cached_html || escapeHtml(taxon.full_name || taxon.cached || ('Taxon #' + otu.id));
               rankEl.textContent = deriveRankLabel(taxon);
+              renderBreadcrumb(parents, taxon);
               renderGbifPanel(stripTags(taxon.cached || taxon.name || taxon.full_name || ''));
             })
             .catch(function () {
               titleEl.innerHTML = escapeHtml(otu.object_tag || ('Otu #' + otu.id));
+              renderBreadcrumb(parents, { name: otu.object_tag });
               renderGbifPanel(stripTags(otu.object_tag || ''));
             });
         }
         titleEl.innerHTML = otu.object_tag || ('Otu #' + escapeHtml(String(otu.id)));
+        renderBreadcrumb(parents, { name: otu.object_tag });
         renderGbifPanel(stripTags(otu.object_tag || ''));
       })
       .catch(function (err) {
