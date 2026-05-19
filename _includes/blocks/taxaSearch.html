@@ -2,53 +2,128 @@
 {% assign projectToken = include.content.projectToken | default: "" %}
 {% assign perPage = include.content.perPage | default: 25 %}
 
-<section class="taxaSearch" style="max-width: 1100px; margin: 0 auto; padding: 2rem 1rem;">
-  <form id="taxaSearchForm" class="taxaSearch__form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; align-items: end; margin-bottom: 1rem;">
-    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
-      Scientific name
-      <input type="text" name="scientificName" placeholder="e.g. Apis" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
-    </label>
-    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
-      Author
-      <input type="text" name="scientificNameAuthorship" placeholder="e.g. Linnaeus" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
-    </label>
-    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
-      Family
-      <input type="text" name="family" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
-    </label>
-    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
-      Genus
-      <input type="text" name="genus" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
-    </label>
-    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
-      Country
-      <input type="text" name="country" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
-    </label>
-    <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
-      Type status
-      <select name="typeStatus" style="padding: 0.4rem 0.5rem; border: 1px solid #ccc; border-radius: 3px;">
-        <option value="">Any</option>
-        <option value="Holotype">Holotype</option>
-        <option value="Lectotype">Lectotype</option>
-        <option value="Syntype">Syntype</option>
-        <option value="Paratype">Paratype</option>
-        <option value="Paralectotype">Paralectotype</option>
-        <option value="Neotype">Neotype</option>
-        <option value="Neolectotype">Neolectotype</option>
-      </select>
-    </label>
-    <div style="display: flex; gap: 0.5rem;">
-      <button type="submit" style="padding: 0.5rem 1rem; background: var(--primary-color, #fa5e97); color: #fff; border: 0; border-radius: 3px; cursor: pointer;">Search</button>
-      <button type="reset" style="padding: 0.5rem 1rem; background: #eee; color: #333; border: 0; border-radius: 3px; cursor: pointer;">Reset</button>
+<div class="taxaSearch">
+  <header class="taxaSearch__hero">
+    <div class="container">
+      <h1 class="title is-5 taxaSearch__title">Taxa search</h1>
+      <form id="taxaSearchForm" class="taxaSearch__form">
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_scientificName">Scientific name</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_scientificName" type="text" name="scientificName" placeholder="e.g. Apis">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_scientificNameAuthorship">Author</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_scientificNameAuthorship" type="text" name="scientificNameAuthorship" placeholder="e.g. Linnaeus">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_family">Family</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_family" type="text" name="family">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_genus">Genus</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_genus" type="text" name="genus">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_country">Country</label>
+          <div class="control">
+            <input class="input is-small" id="taxaSearch_country" type="text" name="country">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label is-small" for="taxaSearch_typeStatus">Type status</label>
+          <div class="control">
+            <div class="select is-small is-fullwidth">
+              <select id="taxaSearch_typeStatus" name="typeStatus">
+                <option value="">Any</option>
+                <option value="Holotype">Holotype</option>
+                <option value="Lectotype">Lectotype</option>
+                <option value="Syntype">Syntype</option>
+                <option value="Paratype">Paratype</option>
+                <option value="Paralectotype">Paralectotype</option>
+                <option value="Neotype">Neotype</option>
+                <option value="Neolectotype">Neolectotype</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field taxaSearch__actions">
+          <div class="control buttons">
+            <button type="submit" class="button is-primary is-small">Search</button>
+            <button type="reset" class="button is-small">Reset</button>
+          </div>
+        </div>
+      </form>
     </div>
-  </form>
+  </header>
 
-  <div id="taxaSearchStatus" style="margin: 0.5rem 0; color: #555; font-size: 0.9rem;"></div>
+  <section class="taxaSearch__body">
+    <div class="container">
+      <div id="taxaSearchStatus" class="taxaSearch__status"></div>
+      <div class="card taxaSearch__card">
+        <div class="card-content taxaSearch__cardContent">
+          <ul id="taxaSearchResults" class="taxaSearch__results"></ul>
+        </div>
+      </div>
+      <nav id="taxaSearchPagination" class="taxaSearch__pagination"></nav>
+    </div>
+  </section>
+</div>
 
-  <ul id="taxaSearchResults" style="list-style: none; padding: 0; margin: 0; border-top: 1px solid #eee;"></ul>
+<style>
+  .taxaSearch__hero {
+    background: #fff;
+    padding: 2rem 0 1.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  .taxaSearch__title { margin-bottom: 1rem; }
+  .taxaSearch__form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.6rem 1rem;
+    align-items: end;
+  }
+  .taxaSearch__actions { align-self: end; }
+  .taxaSearch__actions .buttons { margin-bottom: 0; }
 
-  <nav id="taxaSearchPagination" style="display: flex; gap: 0.5rem; align-items: center; justify-content: center; margin-top: 1rem;"></nav>
-</section>
+  .taxaSearch__body {
+    background: #f5f5f7;
+    padding: 2rem 0 3rem;
+    min-height: 50vh;
+  }
+  .taxaSearch__status {
+    margin: 0 0 0.75rem;
+    color: #555;
+    font-size: 0.9rem;
+    min-height: 1.2em;
+  }
+  .taxaSearch__card { box-shadow: 0 2px 3px rgba(10,10,10,0.05), 0 0 0 1px rgba(10,10,10,0.05); }
+  .taxaSearch__cardContent { padding: 0.25rem 0.75rem; }
+  .taxaSearch__results { list-style: none; padding: 0; margin: 0; }
+  .taxaSearch__results li {
+    padding: 0.65rem 0.5rem;
+    border-bottom: 1px solid #eee;
+  }
+  .taxaSearch__results li:last-child { border-bottom: 0; }
+  .taxaSearch__results a { text-decoration: none; color: inherit; }
+  .taxaSearch__results a:hover { text-decoration: underline; }
+  .taxaSearch__results i { font-style: italic; }
+  .taxaSearch__pagination {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+</style>
 
 <script>
 (function () {
@@ -139,17 +214,26 @@
       .replace(/'/g, '&#39;');
   }
 
+  function sanitizeNameHtml(html) {
+    return escapeHtml(html).replace(/&lt;(\/?)i&gt;/gi, '<$1i>');
+  }
+
+  function nameOfItem(item) {
+    var raw = item.object_tag || item.cached || item.name;
+    if (raw) return sanitizeNameHtml(raw);
+    return escapeHtml('Otu #' + item.id);
+  }
+
   function renderResults(items) {
     if (!items || !items.length) {
-      resultsEl.innerHTML = '<li style="padding: 1rem; color: #777;">No results.</li>';
+      resultsEl.innerHTML = '<li class="has-text-grey">No results.</li>';
       return;
     }
     resultsEl.innerHTML = items.map(function (item) {
-      var name = item.object_tag || item.cached || item.name || ('Otu #' + item.id);
-      return '<li style="padding: 0.6rem 0.4rem; border-bottom: 1px solid #eee;">' +
-        '<a href="/taxon/key?id=' + encodeURIComponent(item.id) + '" style="text-decoration: none; color: inherit;">' +
-        name +
-        ' <span style="color: #999; font-size: 0.85rem;">(id: ' + escapeHtml(item.id) + ')</span>' +
+      return '<li>' +
+        '<a href="/taxon/key?id=' + encodeURIComponent(item.id) + '">' +
+        nameOfItem(item) +
+        ' <span class="has-text-grey is-size-7">(id: ' + escapeHtml(item.id) + ')</span>' +
         '</a></li>';
     }).join('');
   }
@@ -161,17 +245,14 @@
       return;
     }
     var btn = function (label, page, disabled) {
-      return '<button type="button" data-page="' + page + '"' +
-        (disabled ? ' disabled' : '') +
-        ' style="padding: 0.35rem 0.7rem; border: 1px solid #ccc; background: ' +
-        (disabled ? '#f5f5f5' : '#fff') + '; color: #333; border-radius: 3px; cursor: ' +
-        (disabled ? 'default' : 'pointer') + ';">' + label + '</button>';
+      return '<button type="button" class="button is-small" data-page="' + page + '"' +
+        (disabled ? ' disabled' : '') + '>' + label + '</button>';
     };
     paginationEl.innerHTML =
       btn('« First', 1, state.page <= 1) +
       btn('‹ Prev', state.page - 1, state.page <= 1) +
-      '<span style="font-size: 0.9rem; color: #555;">Page ' + state.page + ' of ' + totalPages +
-        ' &middot; ' + state.total.toLocaleString() + ' results</span>' +
+      '<span class="is-size-7 has-text-grey">Page ' + state.page + ' of ' + totalPages +
+        ' · ' + state.total.toLocaleString() + ' results</span>' +
       btn('Next ›', state.page + 1, state.page >= totalPages) +
       btn('Last »', totalPages, state.page >= totalPages);
   }
