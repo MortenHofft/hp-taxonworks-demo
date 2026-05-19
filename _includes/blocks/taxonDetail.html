@@ -1,5 +1,6 @@
 {% assign apiUrl = include.content.apiUrl | default: "https://sfg.taxonworks.org/api/v1" %}
 {% assign projectToken = include.content.projectToken | default: "" %}
+{% assign graphqlEndpoint = site.graphqlEndpoint | default: "https://graphql.gbif.org/graphql" %}
 
 <div class="taxonDetail">
   <header class="taxonDetail__hero">
@@ -171,7 +172,9 @@
 (function () {
   var API_URL = {{ apiUrl | jsonify }};
   var PROJECT_TOKEN = {{ projectToken | jsonify }};
+  var GRAPHQL_ENDPOINT = {{ graphqlEndpoint | jsonify }};
   var GBIF_CHECKLIST_KEY = 'd7dddbf4-2cf0-4f39-9b2a-bb099caae36c';
+  var SITE_OCCURRENCE_PREDICATE = (typeof siteConfig !== 'undefined' && siteConfig && siteConfig.occurrenceSearch && siteConfig.occurrenceSearch.scope) || null;
 
   var titleEl = document.getElementById('taxonDetailTitle');
   var rankEl = document.getElementById('taxonDetailRank');
@@ -420,15 +423,26 @@
   }
 
   function fetchOccurrenceCount(taxonKey) {
-    var url = new URL('https://api.gbif.org/v1/occurrence/search');
-    url.searchParams.set('taxonKey', taxonKey);
-    url.searchParams.set('checklistKey', GBIF_CHECKLIST_KEY);
-    url.searchParams.set('limit', '0');
-    return fetch(url.toString()).then(function (r) {
+    var taxonPredicate = { type: 'equals', key: 'taxonKey', value: String(taxonKey) };
+    var predicate = SITE_OCCURRENCE_PREDICATE
+      ? { type: 'and', predicates: [SITE_OCCURRENCE_PREDICATE, taxonPredicate] }
+      : taxonPredicate;
+    var query = 'query OccurrenceSearch($predicate: Predicate) {\n' +
+      '  occurrenceSearch(predicate: $predicate) {\n' +
+      '    documents(size: 0) { total }\n' +
+      '  }\n' +
+      '}';
+    return fetch(GRAPHQL_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ query: query, variables: { predicate: predicate } })
+    }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(function (d) {
-      return typeof d.count === 'number' ? d.count : null;
+      if (d && d.errors && d.errors.length) throw new Error(d.errors[0].message || 'GraphQL error');
+      var total = d && d.data && d.data.occurrenceSearch && d.data.occurrenceSearch.documents && d.data.occurrenceSearch.documents.total;
+      return typeof total === 'number' ? total : null;
     });
   }
 
