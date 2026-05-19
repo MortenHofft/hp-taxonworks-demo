@@ -273,20 +273,42 @@
   }
 
   // ---- Breadcrumb ----
+  // TaxonWorks returns `otu.parents` as an object map: { "Animalia": [{id, ...}], "Chordata": [...], ... }
+  // where the key is the displayed name and the first item in the array has the otu id.
+  function breadcrumbEntries(parents) {
+    if (Array.isArray(parents)) {
+      return parents.map(function (p) {
+        return {
+          name: plainName(p) || nameHtml(p),
+          html: nameHtml(p),
+          otuId: otuIdOf(p || {})
+        };
+      });
+    }
+    if (parents && typeof parents === 'object') {
+      var out = [];
+      Object.keys(parents).forEach(function (name) {
+        var v = parents[name];
+        var first = Array.isArray(v) ? v[0] : v;
+        var otuId = first && (first.id != null ? first.id : first.otu_id);
+        out.push({ name: name, html: escapeHtml(name), otuId: otuId });
+      });
+      return out;
+    }
+    return [];
+  }
+
   function renderBreadcrumb(parents, current) {
-    var items = [];
-    toArray(parents).forEach(function (p) {
-      if (!p) return;
-      items.push('<li>' + linkItem(p) + '</li>');
+    var items = breadcrumbEntries(parents).map(function (e) {
+      if (e.otuId != null) {
+        return '<li><a href="/taxon/key?id=' + encodeURIComponent(e.otuId) + '">' + e.html + '</a></li>';
+      }
+      return '<li><span>' + e.html + '</span></li>';
     });
     if (current) {
       items.push('<li class="is-active"><span class="taxonDetail__current">' + nameHtml(current) + '</span></li>');
     }
-    if (!items.length) {
-      breadcrumbEl.innerHTML = '';
-      return;
-    }
-    breadcrumbEl.innerHTML = '<ul>' + items.join('') + '</ul>';
+    breadcrumbEl.innerHTML = items.length ? '<ul>' + items.join('') + '</ul>' : '';
   }
 
   // ---- Expandable children tree ----
