@@ -23,7 +23,7 @@
               <p class="card-header-title">Children</p>
             </header>
             <div class="card-content">
-              <div id="taxonDetailChildren" class="content taxonDetail__tree">Loading…</div>
+              <div id="taxonDetailChildren" class="taxonDetail__tree">Loading…</div>
             </div>
           </div>
         </div>
@@ -71,11 +71,12 @@
   .taxonDetail__panels { margin-top: 0; }
 
   .taxonDetail__tree ul {
-    list-style: none;
+    list-style: none !important;
     margin: 0;
     padding-left: 1rem;
   }
   .taxonDetail__tree > ul { padding-left: 0; }
+  .taxonDetail__tree li::marker { content: ''; }
   .taxonDetail__tree li {
     position: relative;
     padding: 0.2rem 0 0.2rem 0.5rem;
