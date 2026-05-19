@@ -284,6 +284,10 @@
     return stripTags(node.cached_html || node.full_name_tag || node.name || node.cached || node.full_name || node.object_tag || '');
   }
 
+  function deriveScientificName(taxon, otu) {
+    return stripTags((taxon && (taxon.full_name || taxon.name)) || (otu && otu.object_label) || '');
+  }
+
   function otuIdOf(node) {
     return node.otu_id != null ? node.otu_id : node.id;
   }
@@ -554,18 +558,18 @@
                 rankEl.textContent = deriveRankLabel(taxon);
               });
               safe(function () { renderBreadcrumb(parents, taxon); });
-              safe(function () { renderGbifPanel(stripTags(taxon.cached || taxon.name || taxon.full_name || '')); });
+              safe(function () { renderGbifPanel(deriveScientificName(taxon, otu)); });
             })
             .catch(function (err) {
               if (window.console) console.error('taxon_names failed', err);
               safe(function () { titleEl.innerHTML = otu.object_tag ? sanitizeNameHtml(otu.object_tag) : escapeHtml('Otu #' + otu.id); });
               safe(function () { renderBreadcrumb(parents, { name: otu.object_tag }); });
-              safe(function () { renderGbifPanel(stripTags(otu.object_tag || '')); });
+              safe(function () { renderGbifPanel(deriveScientificName(null, otu)); });
             });
         }
         safe(function () { titleEl.innerHTML = otu.object_tag ? sanitizeNameHtml(otu.object_tag) : ('Otu #' + escapeHtml(String(otu.id))); });
         safe(function () { renderBreadcrumb(parents, { name: otu.object_tag }); });
-        safe(function () { renderGbifPanel(stripTags(otu.object_tag || '')); });
+        safe(function () { renderGbifPanel(deriveScientificName(null, otu)); });
       })
       .catch(function (err) {
         titleEl.textContent = 'Taxon #' + otuId;
