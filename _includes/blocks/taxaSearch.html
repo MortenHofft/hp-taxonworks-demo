@@ -57,7 +57,7 @@
         <div class="field taxaSearch__actions">
           <div class="control buttons">
             <button type="submit" class="button is-primary is-small">Search</button>
-            <button type="reset" class="button is-small">Reset</button>
+            <button type="reset" class="button is-primary is-outlined is-small">Reset</button>
           </div>
         </div>
       </form>
@@ -245,7 +245,7 @@
       return;
     }
     var btn = function (label, page, disabled) {
-      return '<button type="button" class="button is-small" data-page="' + page + '"' +
+      return '<button type="button" class="button is-small is-primary is-outlined" data-page="' + page + '"' +
         (disabled ? ' disabled' : '') + '>' + label + '</button>';
     };
     paginationEl.innerHTML =
