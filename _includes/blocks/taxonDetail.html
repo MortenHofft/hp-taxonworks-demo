@@ -362,7 +362,7 @@
     var expanded = btn.getAttribute('aria-expanded') === 'true';
 
     if (expanded) {
-      container.innerHTML = '';
+      container.style.display = 'none';
       btn.setAttribute('aria-expanded', 'false');
       btn.textContent = '+';
       btn.setAttribute('title', 'Expand');
@@ -372,9 +372,9 @@
     btn.setAttribute('aria-expanded', 'true');
     btn.textContent = '−';
     btn.setAttribute('title', 'Collapse');
+    container.style.display = '';
 
     if (container.dataset.loaded === '1') {
-      container.style.display = '';
       return;
     }
 
