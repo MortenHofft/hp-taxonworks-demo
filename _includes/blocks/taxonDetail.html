@@ -202,13 +202,21 @@
 
   function toArray(x) {
     if (Array.isArray(x)) return x;
-    if (x && typeof x === 'object') return Object.keys(x).map(function (k) {
-      var v = x[k];
-      if (v && typeof v === 'object' && !Array.isArray(v) && !v.name && !v.object_tag && !v.cached) {
-        // value is itself a wrapper; pass through
-      }
-      return v;
-    });
+    if (x && typeof x === 'object') {
+      return Object.keys(x).map(function (k) {
+        var v = x[k];
+        if (v == null) return null;
+        if (typeof v === 'string' || typeof v === 'number') {
+          return { name: String(v), _rankKey: k };
+        }
+        if (typeof v === 'object') {
+          var wrap = { _rankKey: k };
+          for (var prop in v) if (Object.prototype.hasOwnProperty.call(v, prop)) wrap[prop] = v[prop];
+          return wrap;
+        }
+        return null;
+      }).filter(Boolean);
+    }
     return [];
   }
 
@@ -222,10 +230,23 @@
   }
 
   function nameHtml(node) {
-    return node.name || node.object_tag || node.cached_html || node.full_name_tag || escapeHtml(node.cached || node.full_name || '#' + (node.otu_id || node.id || ''));
+    if (node == null) return '';
+    if (typeof node === 'string' || typeof node === 'number') return escapeHtml(String(node));
+    // Sometimes the parent wraps the actual taxon under one of these keys.
+    var inner = node.taxon_name || node.taxonName || node.otu;
+    return node.object_tag || node.cached_html || node.full_name_tag ||
+      (inner && (inner.object_tag || inner.cached_html || inner.full_name_tag)) ||
+      escapeHtml(
+        node.name || node.cached || node.full_name || node.label ||
+        (inner && (inner.name || inner.cached || inner.full_name)) ||
+        node._rankKey ||
+        ('#' + (node.otu_id || node.id || ''))
+      );
   }
 
   function plainName(node) {
+    if (node == null) return '';
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
     return stripTags(node.cached_html || node.full_name_tag || node.name || node.cached || node.full_name || node.object_tag || '');
   }
 
